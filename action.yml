@@ -1,0 +1,105 @@
+name: Format a renovate release
+description: Re-formats a Python codebase after a relevant renovate change
+
+inputs:
+  github-token:
+    description: GitHub token to use for API calls
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check for renovate changes
+      id: git-changes
+      uses: actions/github-script@v9
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const comparison = await github.rest.repos.compareCommitsWithBasehead({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            basehead: `${context.payload.pull_request.base.sha}...${context.payload.pull_request.head.sha}`,
+          });
+
+          const commits = comparison.data.commits;
+          const interestingDeps = ['ruff', 'black', 'djlint'];
+          const matchedDep = c => interestingDeps.find(dep => c.commit.message.startsWith(`Update dependency ${dep} to `));
+          const isRenovate = c =>
+            c.author?.login === 'renovate[bot]' &&
+            c.author?.type === 'Bot' &&
+            c.author?.id === 29139614;
+          const isInterestingChange = c => matchedDep(c) !== undefined;
+
+          const renovateCommits = commits.filter(c => isRenovate(c) && isInterestingChange(c));
+          const otherCommits = commits.filter(c => !isRenovate(c));
+
+          if (renovateCommits.length > 0 && otherCommits.length === 0) {
+            const updatedDeps = [...new Set(renovateCommits.map(matchedDep))];
+            core.setOutput('need_to_reformat', '1');
+            core.setOutput('updated_deps', updatedDeps.join(', '));
+          }
+
+    - name: Checkout project
+      uses: actions/checkout@v7
+      with:
+        token: ${{ inputs.github-token }}
+        ref: ${{ github.event.pull_request.head.ref }}
+      if: steps.git-changes.outputs.need_to_reformat == '1'
+
+    - name: Re-format project
+      uses: infrabits/ci-format-python-project@main
+      if: steps.git-changes.outputs.need_to_reformat == '1'
+
+    - name: Commit changes
+      uses: actions/github-script@v9
+      env:
+        UPDATED_DEPS: ${{ steps.git-changes.outputs.updated_deps }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { execSync } = require('child_process');
+          const fs = require('fs');
+
+          const statusOutput = execSync('git status --porcelain -z --no-renames', { maxBuffer: 1024 * 1024 * 50 }).toString();
+          const entries = statusOutput.split('\0').filter(Boolean);
+
+          const additions = [];
+          const deletions = [];
+
+          for (const entry of entries) {
+            const status = entry.slice(0, 2);
+            const path = entry.slice(3);
+            if (status.includes('D')) {
+              deletions.push({ path });
+            } else {
+              additions.push({ path, contents: fs.readFileSync(path).toString('base64') });
+            }
+          }
+
+          if (additions.length === 0 && deletions.length === 0) {
+            core.info('No changes to commit');
+            return;
+          }
+
+          const expectedHeadOid = execSync('git rev-parse HEAD').toString().trim();
+
+          const mutation = `
+            mutation ($input: CreateCommitOnBranchInput!) {
+              createCommitOnBranch(input: $input) {
+                commit { oid }
+              }
+            }
+          `;
+
+          await github.graphql(mutation, {
+            input: {
+              branch: {
+                repositoryNameWithOwner: `${context.repo.owner}/${context.repo.repo}`,
+                branchName: context.payload.pull_request.head.ref,
+              },
+              message: { headline: `Re-format code after ${process.env.UPDATED_DEPS} update` },
+              fileChanges: { additions, deletions },
+              expectedHeadOid,
+            },
+          });
+      if: steps.git-changes.outputs.need_to_reformat == '1'
