@@ -11,7 +11,7 @@ runs:
   steps:
     - name: Check for renovate changes
       id: git-changes
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -40,18 +40,18 @@ runs:
           }
 
     - name: Checkout project
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
         token: ${{ inputs.github-token }}
         ref: ${{ github.event.pull_request.head.ref }}
       if: steps.git-changes.outputs.need_to_reformat == '1'
 
     - name: Re-format project
-      uses: infrabits/ci-format-python-project@main
+      uses: infrabits/ci-format-python-project@c7b94c0957ef5d6ddd5bb57483c25552e0a3605d # main
       if: steps.git-changes.outputs.need_to_reformat == '1'
 
     - name: Commit changes
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
       env:
         UPDATED_DEPS: ${{ steps.git-changes.outputs.updated_deps }}
       with:
