@@ -23,7 +23,7 @@ runs:
 
           const commits = comparison.data.commits;
           const interestingDeps = ['ruff', 'black', 'djlint'];
-          const matchedDep = c => interestingDeps.find(dep => c.commit.message.startsWith(`Update dependency ${dep} to `));
+          const matchedDep = c => interestingDeps.find(dep => new RegExp(`^(chore\\(deps\\):\\s*)?update dependency ${dep} to `, 'i').test(c.commit.message));
           const isRenovate = c =>
             c.author?.login === 'renovate[bot]' &&
             c.author?.type === 'Bot' &&
