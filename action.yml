@@ -56,7 +56,7 @@ runs:
       if: steps.git-changes.outputs.need_to_reformat_python == '1'
 
     - name: Re-format npm project
-      uses: infrabits/ci-format-npm-project@main
+      uses: infrabits/ci-format-npm-project@d2f2fca32dbcb535a25654be0fef7e06aabbeb6b # main
       if: steps.git-changes.outputs.need_to_reformat_npm == '1'
 
     - name: Commit changes
