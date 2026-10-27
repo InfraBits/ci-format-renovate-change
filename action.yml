@@ -1,5 +1,5 @@
 name: Format a renovate release
-description: Re-formats a Python codebase after a relevant renovate change
+description: Re-formats a codebase after a relevant renovate change
 
 inputs:
   github-token:
@@ -22,7 +22,9 @@ runs:
           });
 
           const commits = comparison.data.commits;
-          const interestingDeps = ['ruff', 'black', 'djlint'];
+          const interestingPythonDeps = ['ruff', 'black', 'djlint'];
+          const interestingNpmDeps = ['prettier'];
+          const interestingDeps = [...interestingPythonDeps, ...interestingNpmDeps];
           const matchedDep = c => interestingDeps.find(dep => new RegExp(`^(chore\\(deps\\):\\s*)?update dependency ${dep} to `, 'i').test(c.commit.message));
           const isRenovate = c =>
             c.author?.login === 'renovate[bot]' &&
@@ -35,7 +37,10 @@ runs:
 
           if (renovateCommits.length > 0 && otherCommits.length === 0) {
             const updatedDeps = [...new Set(renovateCommits.map(matchedDep))];
-            core.setOutput('need_to_reformat', '1');
+            const hasPythonDep = updatedDeps.some(dep => interestingPythonDeps.includes(dep));
+            const hasNpmDep = updatedDeps.some(dep => interestingNpmDeps.includes(dep));
+            core.setOutput('need_to_reformat_python', hasPythonDep ? '1' : '0');
+            core.setOutput('need_to_reformat_npm', hasNpmDep ? '1' : '0');
             core.setOutput('updated_deps', updatedDeps.join(', '));
           }
 
@@ -44,11 +49,15 @@ runs:
       with:
         token: ${{ inputs.github-token }}
         ref: ${{ github.event.pull_request.head.ref }}
-      if: steps.git-changes.outputs.need_to_reformat == '1'
+      if: steps.git-changes.outputs.need_to_reformat_python == '1' || steps.git-changes.outputs.need_to_reformat_npm == '1'
 
     - name: Re-format project
       uses: infrabits/ci-format-python-project@c56d23e5c4f560b71c46592c694ce840e5d53079 # main
-      if: steps.git-changes.outputs.need_to_reformat == '1'
+      if: steps.git-changes.outputs.need_to_reformat_python == '1'
+
+    - name: Re-format npm project
+      uses: infrabits/ci-format-npm-project@main
+      if: steps.git-changes.outputs.need_to_reformat_npm == '1'
 
     - name: Commit changes
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -102,4 +111,4 @@ runs:
               expectedHeadOid,
             },
           });
-      if: steps.git-changes.outputs.need_to_reformat == '1'
+      if: steps.git-changes.outputs.need_to_reformat_python == '1' || steps.git-changes.outputs.need_to_reformat_npm == '1'
