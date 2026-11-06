@@ -1,6 +1,6 @@
 # Format a renovate change
 
-Re-formats a Python codebase after a relevant renovate change.
+Re-formats a codebase after a relevant Renovate dependency change.
 
 ## Example Usage
 
