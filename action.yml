@@ -47,7 +47,7 @@ runs:
       if: steps.git-changes.outputs.need_to_reformat == '1'
 
     - name: Re-format project
-      uses: infrabits/ci-format-python-project@de635a687e17f62c1639112dc9d54ed5e88b3549 # v1.0.1
+      uses: infrabits/ci-format-python-project@5ba853ba3e86abfb7081bd6178daa1a56540a91c # v1.2.0
       if: steps.git-changes.outputs.need_to_reformat == '1'
 
     - name: Commit changes
